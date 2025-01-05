@@ -1,2 +1,2 @@
 # scripts
-common scripts
+Common shell scripts.
