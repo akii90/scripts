@@ -1,36 +1,43 @@
 #!/bin/bash
-# Author: Vicen
-# Date Created: 2024-04-10
-# Last Modified: 2024-09-03
+
 # Description: Set up a readonly user for postgresql instance.
 # Usage: bash ./set_readonly.sh
+# Requirement: Set local pgpass file, or set trust for PRIVILEGES_USER login
 
-# Requirement:需要配置数据库的连接即可，密码可以配置在.pgpass中，会遍历数据库中的所有库和schema（系统相关的除外）
-
-# 需要设置数据库连接信息
-# 密码设置在 .pgpass中,或者配置免密登录
+# Db connection
 DB_HOST="127.0.0.1"
 DB_PORT=5432
+# User who has privileges to create user and grant privileges
+PRIVILEGES_USER="postgres"
+# DB_OWNER is the user who actually uses the database, modify it according to the actual situation
+DB_OWNER="example_user"
 
-# 执行脚本使用的用户,需要足够权限
-DB_USER="postgres"
-# SVC_USER 是实际业务使用数据库的用户，根据实际情况修改
-SVC_USER="xxx"
 READONLY_USER="readonly"
 READONLY_PASS='password'
-PG_CMD="psql -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER}"
+PG_CMD="psql -h ${DB_HOST} -p ${DB_PORT} -U ${PRIVILEGES_USER}"
 
-# 测试数据库连接
+# Color define
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+# Reset, no color
+RESET='\033[0m'
+
+color_print() {
+    local color=$1
+    local message=$2
+    echo -e "${color}${message}${RESET}"
+}
+
+# Test database connection
 if ! ${PG_CMD} -c "SELECT 1;" > /dev/null 2>&1; then
-    echo -e "\e[31mFailed to connect to PostgreSQL database!!!\e[0m \n"
+    color_print "${RED}" "Failed to connect to PostgreSQL database!!!\n"
     exit 1
 else
-    echo -e "\e[32mSuccessfully connected to PostgreSQL database.\e[0m \n"
+    color_print "${GREEN}" "Successfully connected to PostgreSQL database.\n"
 fi
 
-
-# 创建只读用户
-echo "Create ${READONLY_USER} user"
+# Create readonly user
+color_print "${GREEN}" "Create ${READONLY_USER} user"
 ${PG_CMD} -d "postgres" -c "CREATE USER ${READONLY_USER} WITH ENCRYPTED PASSWORD '${READONLY_PASS}' ;"
 
 set -e
@@ -39,24 +46,24 @@ DB_LIST=`${PG_CMD} -d "postgres" -t -c "SELECT datname FROM pg_database WHERE da
 
 for db_name in ${DB_LIST};do 
     
-    # 授予连接数据库的权限
+    # Grant connect permission to database
     ${PG_CMD} -d ${db_name} -c "GRANT CONNECT ON DATABASE \"${db_name}\" TO ${READONLY_USER};"
 
     schema_list=`${PG_CMD} -d ${db_name} -t -c "SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT LIKE 'pg_%' AND schema_name <> 'information_schema';"`
     for schema in ${schema_list};do 
-        # 授予在特定 schema 使用此用户的权限
+        # Grant usage permission to schema
         ${PG_CMD} -d ${db_name} -c "GRANT USAGE ON SCHEMA ${schema} TO ${READONLY_USER};"
-        # 为现有的所有表赋予 SELECT 权限
+        # Grant SELECT permission to existing tables
         ${PG_CMD} -d ${db_name} -c "GRANT SELECT ON ALL TABLES IN SCHEMA ${schema} TO ${READONLY_USER};"
 
-        # 为新表自动赋予 SELECT 权限
-        # 注意：这里我们为 SVC_USER 执行，即为 SVC_USER 创建的新表自动授权，如果需要为其他用户设置，需要更改 SVC_USER 变量
-        ${PG_CMD} -d ${db_name} -c "ALTER DEFAULT PRIVILEGES FOR USER ${SVC_USER} IN SCHEMA ${schema} GRANT SELECT ON TABLES TO ${READONLY_USER};"
+        # Grant SELECT permission to new tables of owner automatically
+        # Note: Here we execute for DB_OWNER, that is, the new tables created by DB_OWNER will be automatically authorized, if you need to set it for other users, you need to change the DB_OWNER variable
+        ${PG_CMD} -d ${db_name} -c "ALTER DEFAULT PRIVILEGES FOR USER ${DB_OWNER} IN SCHEMA ${schema} GRANT SELECT ON TABLES TO ${READONLY_USER};"
 
     done
-    echo -e "\n${db_name} 配置的默认访问权限:"
+    color_print "${GREEN}" "${db_name} default access permission:"
     ${PG_CMD} -d ${db_name} -c "\ddp"
 done
 set +e
-echo -e "\e[32m权限配置完成，以下是当前数据库的权限:\e[0m"
+color_print "${GREEN}" "Permission configuration completed, here is the current database permission:"
 ${PG_CMD} -d "postgres" -c "\l"
