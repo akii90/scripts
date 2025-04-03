@@ -9,7 +9,19 @@ MAGENTA='\033[0;35m'
 CYAN='\033[0;36m'
 
 # Reset, no color
-NC='\033[0m'
+RESET='\033[0m'
 
-# Color output example
-echo -e "${RED}Red content${NC}"
+# Color print function
+color_print() {
+    local color=$1
+    local message=$2
+    echo -e "${color}${message}${RESET}"
+}
+
+# Test color print
+color_print "${RED}" "Red content"
+color_print "${GREEN}" "Green content"
+color_print "${YELLOW}" "Yellow content"
+color_print "${BLUE}" "Blue content"
+color_print "${MAGENTA}" "Magenta content"
+color_print "${CYAN}" "Cyan content"
