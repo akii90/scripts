@@ -1,6 +1,9 @@
 #! /bin/bash
 
-# Logs
+# Print
+std_print() {
+  command printf %s\\n "$*"
+}
 info()
 {
     echo '[INFO] ' "$@"
