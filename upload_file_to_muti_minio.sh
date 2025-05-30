@@ -58,7 +58,7 @@ done
 # Upload file to each Minio server and generate public access URL
 for server in "${MINIO_SERVER_NAMES[@]}"; do
     # Extract env information from server name for URL
-    env=$(echo $server)
+    env=${server}
     url="http://minio.${env}.example.com"
 
     echo "Upload file to $server"
