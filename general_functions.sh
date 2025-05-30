@@ -50,3 +50,6 @@ color_print() {
     local message=$2
     echo -e "${color}${message}${RESET}"
 }
+
+# Test
+color_print "$RED" "Hello"
